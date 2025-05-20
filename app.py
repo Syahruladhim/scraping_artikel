@@ -6,17 +6,26 @@ import pymongo
 import matplotlib.pyplot as plt
 from datetime import datetime
 
+# ———————————————————————————
+# 1) Koneksi MongoDB via Streamlit Secrets
+# Tambahkan di .streamlit/secrets.toml:
+#
+# [mongo]
+# uri = "mongodb+srv://admin:admin0010@bigdata.97avssw.mongodb.net/bigdata?retryWrites=true&w=majority"
+# ———————————————————————————
+
 # Setup MongoDB dengan timeout dan pengecekan ping
 try:
+    mongo_uri = st.secrets["mongo"]["uri"]
     client = pymongo.MongoClient(
-        "mongodb+srv://admin:admin0010@bigdata.97avssw.mongodb.net/",
+        mongo_uri,
         serverSelectionTimeoutMS=5000  # timeout 5 detik
     )
-    # Ping untuk cek koneksi
-    client.admin.command('ping')
+    client.admin.command('ping')  # ping untuk cek koneksi
     st.success("✔️ Koneksi ke MongoDB Atlas berhasil")
 except Exception as e:
-    st.error(f"❌ Gagal koneksi ke MongoDB Atlas: {e}")
+    # Tampilkan error lengkap untuk debug
+    st.error(f"❌ Gagal koneksi ke MongoDB Atlas:\n{e}")
     st.stop()  # hentikan eksekusi aplikasi jika koneksi gagal
 
 db = client["bigdata"]
@@ -27,7 +36,7 @@ try:
     idx_name = collection.create_index("link", unique=True)
     st.info(f"✔️ Index unik pada 'link' berhasil dibuat (name: {idx_name})")
 except Exception as e:
-    st.warning(f"⚠️ Gagal membuat index unik pada 'link': {e}")
+    st.warning(f"⚠️ Gagal membuat index unik pada 'link':\n{e}")
 
 # Daftar nama tari
 nama_tari = [
