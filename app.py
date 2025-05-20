@@ -6,27 +6,28 @@ import pymongo
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-# Setup MongoDB dengan timeout
+# Setup MongoDB dengan timeout dan pengecekan ping
 try:
     client = pymongo.MongoClient(
-        "mongodb+srv://admin:admin0010@bigdata.97avssw.mongodb.net/"
-        "?retryWrites=true&w=majority&appName=bigdata",
-        serverSelectionTimeoutMS=5000  # 5 detik timeout
+        "mongodb+srv://admin:admin0010@bigdata.97avssw.mongodb.net/",
+        serverSelectionTimeoutMS=5000  # timeout 5 detik
     )
-    # Cek koneksi singkat
+    # Ping untuk cek koneksi
     client.admin.command('ping')
+    st.success("✔️ Koneksi ke MongoDB Atlas berhasil")
 except Exception as e:
-    st.error(f"Gagal koneksi ke MongoDB: {e}")
-    st.stop()  # hentikan eksekusi jika tidak bisa connect
+    st.error(f"❌ Gagal koneksi ke MongoDB Atlas: {e}")
+    st.stop()  # hentikan eksekusi aplikasi jika koneksi gagal
 
 db = client["bigdata"]
 collection = db["tarian"]
 
-# (Opsional) Buat index unik pada field link agar mencegah duplikasi
+# Buat index unik pada field 'link', tangani jika gagal
 try:
-    collection.create_index("link", unique=True)
+    idx_name = collection.create_index("link", unique=True)
+    st.info(f"✔️ Index unik pada 'link' berhasil dibuat (name: {idx_name})")
 except Exception as e:
-    st.warning(f"Tidak dapat membuat index unik pada 'link': {e}")
+    st.warning(f"⚠️ Gagal membuat index unik pada 'link': {e}")
 
 # Daftar nama tari
 nama_tari = [
@@ -42,7 +43,7 @@ def get_article_text(url):
         paragraphs = soup.find_all('p')
         return " ".join(p.get_text() for p in paragraphs)
     except Exception as e:
-        st.warning(f"Gagal ambil isi artikel dari {url}: {e}")
+        print(f"[Warning] Gagal ambil isi artikel dari {url}: {e}")
         return ""
 
 def scrape_detik():
@@ -61,14 +62,17 @@ def scrape_detik():
             cat_el   = article.find('span', class_='category')
             if not (title_el and link_el and date_el):
                 continue
+
             title = title_el.text.strip()
             link  = link_el['href']
+            # Skip jika sudah tersimpan
             if collection.find_one({'link': link}):
-                # sudah ada, skip
                 continue
+
             date     = date_el.text.strip()
             category = cat_el.text.strip() if cat_el else "Unknown"
             content  = get_article_text(link)
+
             articles.append({
                 'source':     'Detik',
                 'title':      title,
@@ -79,26 +83,26 @@ def scrape_detik():
                 'scraped_at': datetime.now()
             })
     except Exception as e:
-        st.error(f"Scraping error: {e}")
+        st.error(f"[Error] Scraping Detik gagal: {e}")
     return articles
 
 def save_to_mongodb(articles):
     if not articles:
-        st.warning("Tidak ada artikel untuk disimpan.")
+        st.warning("Tidak ada artikel baru untuk disimpan.")
         return
     try:
         collection.insert_many(articles, ordered=False)
         st.success(f"{len(articles)} artikel berhasil disimpan.")
     except pymongo.errors.BulkWriteError as bwe:
-        st.warning("Beberapa artikel mungkin sudah ada: " + str(bwe.details))
+        st.warning(f"Beberapa artikel mungkin sudah ada: {bwe.details}")
 
 def visualize_tari_frequency():
     data = list(collection.find())
     if not data:
-        st.warning("Tidak ada data untuk visualisasi.")
+        st.warning("Tidak ada data untuk visualisasi frekuensi.")
         return
     df = pd.DataFrame(data)
-    freq = {t:0 for t in nama_tari}
+    freq = {t: 0 for t in nama_tari}
     for content in df['content'].fillna(""):
         lower = content.lower()
         for t in nama_tari:
@@ -114,7 +118,7 @@ def visualize_tari_frequency():
 def visualize_category_distribution():
     data = list(collection.find())
     if not data:
-        st.warning("Tidak ada data untuk visualisasi.")
+        st.warning("Tidak ada data untuk visualisasi kategori.")
         return
     df = pd.DataFrame(data)
     counts = df['category'].value_counts()
@@ -128,7 +132,7 @@ def visualize_category_distribution():
 def visualize_scraping_trend():
     data = list(collection.find())
     if not data:
-        st.warning("Tidak ada data untuk visualisasi.")
+        st.warning("Tidak ada data untuk visualisasi tren.")
         return
     df = pd.DataFrame(data)
     df['scraped_at'] = pd.to_datetime(df['scraped_at'])
@@ -142,9 +146,10 @@ def visualize_scraping_trend():
 
 def main():
     st.title("Scraper & Visualisasi Tarian Jawa Tengah")
+    # Scrape & simpan satu kali per sesi
     if "scraped_once" not in st.session_state:
-        articles = scrape_detik()
-        save_to_mongodb(articles)
+        new_articles = scrape_detik()
+        save_to_mongodb(new_articles)
         st.session_state.scraped_once = True
 
     tab1, tab2 = st.tabs(["Artikel Terbaru", "Visualisasi"])
