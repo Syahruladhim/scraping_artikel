@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 # Setup MongoDB
-client = pymongo.MongoClient("mongodb://localhost:27017/")
+client = pymongo.MongoClient("mongodb+srv://admin:admin0010@bigdata.97avssw.mongodb.net/?retryWrites=true&w=majority&appName=bigdata")
 db = client["tarian"]
 collection = db["apawis"]
 
