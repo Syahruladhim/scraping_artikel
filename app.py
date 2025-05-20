@@ -19,8 +19,8 @@ except Exception as e:
     st.error(f"Gagal koneksi ke MongoDB: {e}")
     st.stop()  # hentikan eksekusi jika tidak bisa connect
 
-db = client["tarian"]
-collection = db["apawis"]
+db = client["bigdata"]
+collection = db["tarian"]
 
 # (Opsional) Buat index unik pada field link agar mencegah duplikasi
 try:
